@@ -164,7 +164,7 @@ class RNN:
 #endregion
 
 # Read csv files
-df = read_csv('C:/Users/KJH0517/Documents/Python Projects/AI_Lecture/deeplearning/corona_daily.csv', usecols=[3], engine='python', skipfooter=3)
+df = read_csv('corona_daily.csv', usecols=[3], engine='python', skipfooter=3)
 dataSet = df.values
 dataSet = dataSet.astype('float32')
 
