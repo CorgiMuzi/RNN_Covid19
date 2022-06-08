@@ -168,9 +168,11 @@ df = read_csv('corona_daily.csv', usecols=[3], engine='python', skipfooter=3)
 dataSet = df.values
 dataSet = dataSet.astype('float32')
 
-# Load training datas and test datas from csv
+# Change dataset values between 0 and 1
 scaler = MinMaxScaler(feature_range=(0, 1))
 Dataset = scaler.fit_transform(dataSet)
+
+# Split dataset to two groups (train group, test group)
 train_data, test_data = train_test_split(Dataset, test_size=0.2, shuffle=False)
 
 # Change dataset's format for our RNN structure
