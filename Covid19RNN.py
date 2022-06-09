@@ -1,5 +1,6 @@
 # Pre-processing 
 import math, sys
+import random
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
@@ -7,7 +8,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pandas import read_csv
 
-#region Funcionts
+#region Functions
+def rand(a, b):
+    return (b-a)*random.random() + a
+
+def makeMatrix(I, J, fill=0.0):
+    m = []
+
+    for i in range(I):
+        m.append([fill]*J)
+
+    return m
+
+
 def ChangeDataFormat(dataset, formerDataLen):
     ''' Change dataset's form to fit in our RNN data structure
     Parameters
@@ -24,6 +37,139 @@ def ChangeDataFormat(dataset, formerDataLen):
         predictData.append(dataset[i+formerDataLen, 0])
     return np.array(formerData), np.array(predictData)
 
+def sigmoid(x):
+    return 1/(1+math.exp(-x))
+def dsigmoid(y):
+    return sigmoid(y)*(1-sigmoid(y))
+
+def ReLU(x):
+    return max(0.01*x, x)
+
+def dReLU(y):
+    if y<0:
+        return 0.01
+    elif y>=0:
+        return 1
+#endregion
+#region DenseLayer
+class Dense:
+
+    def __init__(self, ni, nh, no):
+        self.ni = ni + 1 # +1 for bias node
+        self.nh = nh
+        self.no = no
+
+        self.ai = [1.0]*self.ni
+        self.ah = [1.0]*self.nh
+        self.ao = [1.0]*self.no
+
+        self.wi = makeMatrix(self.ni, self.nh)
+        self.wo = makeMatrix(self.nh, self.no)
+
+        for i in range(self.ni):
+            for j in range(self.nh):
+                self.wi[i][j] = rand(-0.2, 0.2)
+
+        for j in range(self.nh):
+            for k in range(self.no):
+                self.wo[j][k] = rand(-2.0, 2.0)
+
+        self.ci = makeMatrix(self.ni, self.nh)
+        self.co = makeMatrix(self.nh, self.no)
+
+    def update(self, inputs):
+        if len(inputs) != self.ni-1:
+            raise ValueError('wrong number of inputs')
+
+        for i in range(self.ni-1):
+            self.ai[i] = inputs[i]
+
+        for j in range(self.nh):
+            sum = 0.0
+            for i in range(self.ni):
+                sum = sum + self.ai[i] * self.wi[i][j]
+            self.ah[j] = ReLU(sum)
+
+        for k in range(self.no):
+            sum = 0.0
+            for j in range(self.nh):
+                sum = sum + self.ah[j] * self.wo[j][k]
+            self.ao[k] = sigmoid(sum)
+
+        return self.ao[:]
+
+    def backPropagate(self, targets, N, M):
+        if len(targets) != self.no:
+            raise ValueError('wrong number of target values')
+
+        output_deltas = [0.0] * self.no
+
+        for k in range(self.no):
+            error = targets[k]-self.ao[k]
+            output_deltas[k] = dsigmoid(self.ao[k]) * error
+
+        hidden_deltas = [0.0] * self.nh
+
+        for j in range(self.nh):
+            error = 0.0
+            for k in range(self.no):
+                error = error + output_deltas[k]*self.wo[j][k] 
+            hidden_deltas[j] = dReLU(self.ah[j]) * error
+
+        for j in range(self.nh):
+            for k in range(self.no):
+                change = output_deltas[k]*self.ah[j]
+
+                self.wo[j][k] = self.wo[j][k] + N*change + M*self.co[j][k]
+                self.co[j][k] = change 
+
+        for i in range(self.ni):
+            for j in range(self.nh):
+                change = hidden_deltas[j]*self.ai[i]
+
+                self.wi[i][j] = self.wi[i][j] + N*change + M*self.ci[i][j]
+
+                self.ci[i][j] = change
+
+        error = 0.0
+
+        for k in range(len(targets)):
+            error = error + 0.5*(targets[k]-self.ao[k])**2
+
+        return error
+
+    def test(self, patterns):
+        for p in patterns:
+            print(p[0], '->', self.update(p[0]))
+
+    def weights(self):
+        print('Input weights:')
+        
+        for i in range(self.ni):
+            print(self.wi[i])
+
+        print()
+        print('Output weights:')
+
+        for j in range(self.nh):
+            print(self.wo[j])
+
+    def train(self, x, y, iterations=1000, N=0.5, M=0.1):
+        for i in range(iterations):
+            error = 0.0
+            for x, y in zip(x, y):
+                inputs = x
+                targets = y
+
+                self.update(inputs)
+
+                error = error + self.backPropagate(targets, N, M)
+
+            if i % 100 == 0:
+                print('error %-.5f' % error)
+
+#endregion
+#region RNN
 class RNN:
     ''' Recurrent Neural Network '''
     def __init__(self, cells_count=10, batch_size=32, learning_rate=0.1):
@@ -47,9 +193,10 @@ class RNN:
         ''' Forpass calculating output '''
         # Initialize cells
         self.h = [np.zeros((x.shape[0], self.cells_count))]
-
-        # NOTE: I need to understand what is 'x' and how it works
+        
         seq = np.swapaxes(x, 0, 1)
+        # x.shape = (3, 1, 3) -> (batch_size, 1, formerDataLen)
+        # swap -> (1, 3, 3) -> 1 group has 3 batch data, 1 batch data contains 3 data
 
         for x in seq:
             z1 = np.dot(x, self.w1x) + np.dot(self.h[-1], self.w1h) + self.b1
@@ -160,8 +307,9 @@ class RNN:
         a = np.clip(a, 1e-10, 1-1e-10)
         val_loss = np.mean(-(y_val*np.log(a) + (1-y_val) * np.log(1-a)))
         self.val_losses.append(val_loss)
-
 #endregion
+
+
 
 # Read csv files
 df = read_csv('corona_daily.csv', usecols=[3], engine='python', skipfooter=3)
@@ -200,10 +348,13 @@ print(f"> Train dataset : {X_train.shape}\n> Test dataset : {X_test.shape}")
 
 # Create sequential model to solve the RNN with time step
 NN_Model = RNN(cells_count=3, batch_size=3, learning_rate=0.01)
+DenseLayer = Dense(3, 7, 1)
 
-NN_Model.fit(X_train, y_train, epochs=40, x_val=X_test, y_val=y_test)
+NN_Model.fit(X_train, y_train, epochs=100, x_val=X_test, y_val=y_test)
+DenseLayer.train(zip(NN_Model.predict(X_train), y_train))
+DenseLayer.test(zip(NN_Model.predict(X_test), y_test))
  
-plt.plot(NN_Model.losses, label='train loss')
-plt.plot(NN_Model.val_losses, label='test loss')
+plt.plot(DenseLayer.losses, label='train loss')
+plt.plot(DenseLayer.val_losses, label='test loss')
 plt.legend()
 plt.show()
