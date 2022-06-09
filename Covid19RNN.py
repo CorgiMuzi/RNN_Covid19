@@ -38,7 +38,7 @@ def ChangeDataFormat(dataset, formerDataLen):
     return np.array(formerData), np.array(predictData)
 
 def sigmoid(x):
-    return 1/(1+math.exp(-x))
+    return 1/(1+np.exp(-x))
 def dsigmoid(y):
     return sigmoid(y)*(1-sigmoid(y))
 
@@ -157,9 +157,9 @@ class Dense:
     def train(self, x, y, iterations=1000, N=0.5, M=0.1):
         for i in range(iterations):
             error = 0.0
-            for x, y in zip(x, y):
-                inputs = x
-                targets = y
+            for xi, yt in zip(x, y):
+                inputs = xi
+                targets = [yt]
 
                 self.update(inputs)
 
@@ -351,8 +351,10 @@ NN_Model = RNN(cells_count=3, batch_size=3, learning_rate=0.01)
 DenseLayer = Dense(3, 7, 1)
 
 NN_Model.fit(X_train, y_train, epochs=100, x_val=X_test, y_val=y_test)
-DenseLayer.train(zip(NN_Model.predict(X_train), y_train))
-DenseLayer.test(zip(NN_Model.predict(X_test), y_test))
+X_train2, Y_train2 = ChangeDataFormat(NN_Model.predict(X_train), formerDataLen)
+X_test2, Y_test2 = ChangeDataFormat(NN_Model.predict(X_test), formerDataLen)
+DenseLayer.train(X_train2, Y_train2)
+DenseLayer.test(zip(X_test2, Y_test2))
  
 plt.plot(DenseLayer.losses, label='train loss')
 plt.plot(DenseLayer.val_losses, label='test loss')
