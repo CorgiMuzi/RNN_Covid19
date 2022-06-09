@@ -1,6 +1,7 @@
 # Pre-processing 
 import math, sys
 import random
+from tkinter import Y
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
@@ -88,7 +89,7 @@ class Dense:
             sum = 0.0
             for i in range(self.ni):
                 sum = sum + self.ai[i] * self.wi[i][j]
-            self.ah[j] = ReLU(sum)
+            self.ah[j] = sigmoid(sum)
 
         for k in range(self.no):
             sum = 0.0
@@ -114,7 +115,7 @@ class Dense:
             error = 0.0
             for k in range(self.no):
                 error = error + output_deltas[k]*self.wo[j][k] 
-            hidden_deltas[j] = dReLU(self.ah[j]) * error
+            hidden_deltas[j] = dsigmoid(self.ah[j]) * error
 
         for j in range(self.nh):
             for k in range(self.no):
@@ -154,12 +155,12 @@ class Dense:
         for j in range(self.nh):
             print(self.wo[j])
 
-    def train(self, x, y, iterations=1000, N=0.5, M=0.1):
+    def train(self, patterns, iterations=1000, N=0.5, M=0.1):
         for i in range(iterations):
             error = 0.0
-            for xi, yt in zip(x, y):
-                inputs = xi
-                targets = [yt]
+            for x, y in patterns:
+                inputs = x
+                targets = y
 
                 self.update(inputs)
 
@@ -348,15 +349,29 @@ print(f"> Train dataset : {X_train.shape}\n> Test dataset : {X_test.shape}")
 
 # Create sequential model to solve the RNN with time step
 NN_Model = RNN(cells_count=3, batch_size=3, learning_rate=0.01)
-DenseLayer = Dense(3, 7, 1)
+DenseLayer = Dense(3, 3, 1)
 
 NN_Model.fit(X_train, y_train, epochs=100, x_val=X_test, y_val=y_test)
 X_train2, Y_train2 = ChangeDataFormat(NN_Model.predict(X_train), formerDataLen)
 X_test2, Y_test2 = ChangeDataFormat(NN_Model.predict(X_test), formerDataLen)
-DenseLayer.train(X_train2, Y_train2)
-DenseLayer.test(zip(X_test2, Y_test2))
+
+trainArr = [
+    [[X_train2[0][0],X_train2[0][1],X_train2[0][2]], [Y_train2[0]]],
+    [[X_train2[1][0],X_train2[1][1],X_train2[1][2]], [Y_train2[1]]],
+    [[X_train2[2][0],X_train2[2][1],X_train2[2][2]], [Y_train2[2]]],
+]
+
+DenseLayer.train(trainArr)
+
+testArr = [
+    [[X_test2[0][0],X_test2[0][1],X_test2[0][2]], [Y_test2[0]]],
+    [[X_test2[1][0],X_test2[1][1],X_test2[1][2]], [Y_test2[1]]],
+    [[X_test2[2][0],X_test2[2][1],X_test2[2][2]], [Y_test2[2]]],
+]
+
+DenseLayer.test(testArr)
  
-plt.plot(DenseLayer.losses, label='train loss')
-plt.plot(DenseLayer.val_losses, label='test loss')
-plt.legend()
-plt.show()
+# plt.plot(DenseLayer.losses, label='train loss')
+# plt.plot(DenseLayer.val_losses, label='test loss')
+# plt.legend()
+# plt.show()
